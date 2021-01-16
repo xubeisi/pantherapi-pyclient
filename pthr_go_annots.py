@@ -1,7 +1,11 @@
+#!/usr/bin/env python
+from __future__ import print_function
 import argparse
 import requests
 import json
 from urllib.parse import quote
+
+import sys
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-s', '--service', help="Panther API service to call (e.g. 'enrich', 'geneinfo', 'ortholog')")
@@ -52,7 +56,6 @@ class EnrichResponse(Response):
             print("ERROR: Parsing response failed. Full response:\n{}".format(self.response))
             exit()
         print(len(results), "terms in reference list")  # Our result count
-
         display_headers = ["GO Term", "Expected", "Fold enrichment", "raw P value", "FDR", "Term label"]
         print("\t".join(display_headers))
 
@@ -182,13 +185,53 @@ def check_args(args):
     if args.service is None:
         print("ERROR: Please specify a service to call with --service")
         exit()
-    elif args.service not in SERVICE_OBJ_LOOKUP:
+    elif args.service not in SERVICE_OBJ_LOOKUP and args.service not in [ 'treejson2tab']:
         print("ERROR: --service '{}' is not a supported service".format(args.service))
         exit()
     if args.params_file is None:
         print("ERROR: Please specify a parameters file with --params_file")
         exit()
     # TODO: Check if args.seq_id_file is req'd for certain services
+
+
+def treejson2tab(jjj):
+    resultsgrouped = jjj["overrepresentation"]['group']
+    results = []
+    for rg in resultsgrouped:
+        r1 = rg['result']
+        if 'input_list' in r1:
+            results.append(r1)
+        else:
+            for r in r1:
+                if 'input_list' in r:
+                    results.append(r)
+    #print(results)
+    display_headers = ["GO_Term_ID", "Expected", "Fold_Enrichment", "P.value", "FDR", "Term_label", "Term_Level", "nOverlap", "Genes"]
+    print("\t".join(display_headers))
+
+    results.sort(key=lambda x: float(x['input_list']['fold_enrichment']), reverse=True)  # Sort in same order as pantherdb.org
+    for r0 in results:
+        r = r0['input_list']
+        fold_enrichment, plus_minus = r['fold_enrichment'], r['plus_minus']
+        if fold_enrichment > 0 and plus_minus == "+" and r['number_in_list'] > 5:
+            # Print result line
+            term_id = r0['term'].get("id")
+            if term_id is None:  # Handling REACTOME "UNCLASSIFIED"
+                term_id = ""
+            print("\t".join([
+                term_id,
+                str(r['expected']),  # Convert float to string for printing
+                str(fold_enrichment),
+                str(r['pValue']),
+                str(r['fdr']),
+                r0['term']["label"],
+                str(r0['term']["level"]),
+                str(r['number_in_list']),
+                " ".join(r['mapped_id_list']['mapped_id'])
+                ])
+            )
+
+
 
 
 # Script entry point
@@ -199,6 +242,9 @@ if __name__ == "__main__":
 
     with open(args.params_file) as pf:
         request_parameters = json.loads(pf.read())
+    if args.service == "treejson2tab":
+        treejson2tab(request_parameters)
+        sys.exit()
 
     # Parse sequence ID file (from -f argument) and format list to comma-delimited string
     if args.seq_id_file:

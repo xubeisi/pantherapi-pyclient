@@ -13,6 +13,8 @@ $ pip3 install -r requirements.txt
 ## Running
 ```
 $ python3 pthr_go_annots.py --service enrich --params_file params/enrich.json --seq_id_file resources/test_ids.txt
+#json from Pantherdb Entrance: [geneontology](http://geneontology.org/) or [Pantherdb](http://pantherdb.org/tools/index.jsp) have Hierarchy that level could be exported
+$ python3 pthr_go_annots.py --service treejson2tab --params_file analysis.up.json > analysis.tsv
 ```
 - Currently, there are three options for --service.
   - _enrich_ -- This is the statistical overrepresentation test on a list of genes.
